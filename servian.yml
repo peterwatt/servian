@@ -1,0 +1,157 @@
+AWSTemplateFormatVersion: 2010-09-09
+
+Description: Automation Engineer Technical Assessment - Vibrato_Servian
+
+Resources:
+  DynamoTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: Assessment
+      AttributeDefinitions:
+        - AttributeName: count
+          AttributeType: N
+      KeySchema:
+        - AttributeName: count
+          KeyType: HASH
+      BillingMode: PAY_PER_REQUEST
+      SSESpecification:
+        SSEEnabled: true
+
+  LambdaFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Code:
+        ZipFile: !Sub |
+          import json
+          import boto3
+          def dynamo_itemcreate(count):
+              dynamodb = boto3.client('dynamodb')
+              db_name = "Assessment"
+              dynamodb.put_item(TableName=db_name, Item={'count': count)
+              
+          def lambda_handler(event, context):
+              dynamo_itemcreate(1)
+              
+      Description: API Gateway Assessment
+      Handler: index.lambda_handler
+      MemorySize: 128
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Runtime: python3.7
+      Timeout: 5
+
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - lambda.amazonaws.com
+          Action:
+          - sts:AssumeRole
+      Path: "/"
+      Policies:
+      - PolicyName: Assessment
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+            - dynamodb:PutItem
+            Resource: !GetAtt DynamoTable.Arn
+
+
+
+  APIPermission:
+    Type: 'AWS::Lambda::Permission'
+    Properties:
+      Action: 'lambda:invokeFunction'
+      FunctionName:
+        'Fn::GetAtt':
+          - LambdaFunction
+          - Arn
+      Principal: apigateway.amazonaws.com
+      SourceArn:
+        'Fn::Join':
+          - ''
+          - - 'arn:aws:execute-api:'
+            - Ref: 'AWS::Region'
+            - ':'
+            - Ref: 'AWS::AccountId'
+            - ':'
+            - Ref: ApiRestApi
+            - /*
+
+
+  ApiRestApi:
+    Type: 'AWS::ApiGateway::RestApi'
+    Properties:
+      Name: !Sub Servian
+      EndpointConfiguration:
+        Types: 
+          - REGIONAL
+
+  ApiResource:
+    Type: 'AWS::ApiGateway::Resource'
+    Properties:
+      ParentId: !GetAtt 
+        - ApiRestApi
+        - RootResourceId
+      RestApiId: !Ref ApiRestApi
+      PathPart: 'add_new'
+
+  ApiMethod:
+    Type: 'AWS::ApiGateway::Method'
+    Properties:
+      RestApiId: !Ref ApiRestApi
+      ResourceId: !Ref ApiResource
+      HttpMethod: POST
+      AuthorizationType: NONE
+      Integration:
+        Type: AWS
+        IntegrationHttpMethod: POST
+        Uri: !Join 
+          - ''
+          - - 'arn:aws:apigateway:'
+            - !Ref 'AWS::Region'
+            - ':lambda:path/2015-03-31/functions/'
+            - !GetAtt 
+              - LambdaFunction
+              - Arn
+            - /invocations
+        IntegrationResponses:
+          - ResponseTemplates:
+              application/json: '{}'
+            ResponseParameters:
+              method.response.header.Location: integration.response.body.headers.uid
+            StatusCode: 201
+        PassthroughBehavior: NEVER
+      MethodResponses:
+        - ResponseModels:
+            application/json: Empty
+          ResponseParameters:
+            method.response.header.Location: true
+          StatusCode: 201
+
+  ApiDeployment:
+    Type: 'AWS::ApiGateway::Deployment'
+    Properties:
+      RestApiId: !Ref ApiRestApi
+      StageName: v1
+    DependsOn:
+      - ApiMethod
+      - ApiRestApi
+      - APIPermission
+
+Outputs:
+  Url:
+    Description: Root URL of the API gateway
+    Value: !Join 
+      - ''
+      - - 'https://'
+        - !Ref ApiRestApi
+        - .execute-api.
+        - !Ref 'AWS::Region'
+        - .amazonaws.com/
