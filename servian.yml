@@ -24,14 +24,22 @@ Resources:
         ZipFile: !Sub |
           import json
           import boto3
-          def dynamo_itemcreate(count):
-              dynamodb = boto3.client('dynamodb')
-              db_name = "Assessment"
-              dynamodb.put_item(TableName=db_name, Item={'count': {'N': count}})
               
           def lambda_handler(event, context):
-              dynamo_itemcreate('1')
+              dynamodb = boto3.client('dynamodb')
               
+              dynamodb.put_item(TableName='Assessment', Item={'count': {'N': '3'}})
+              
+              response = dynamodb.scan(TableName='Assessment')
+              
+              j = 0
+              for i in response['Items']:
+                  print(i['count'])
+                  j += 1
+              print(j)
+
+              
+
       Description: API Gateway Assessment
       Handler: index.lambda_handler
       MemorySize: 128
@@ -50,7 +58,7 @@ Resources:
             Service:
             - lambda.amazonaws.com
           Action:
-          - sts:AssumeRole
+            - sts:AssumeRole
       Path: "/"
       Policies:
       - PolicyName: Assessment
@@ -59,10 +67,8 @@ Resources:
           Statement:
           - Effect: Allow
             Action:
-            - dynamodb:PutItem
+            - dynamodb:*
             Resource: !GetAtt DynamoTable.Arn
-
-
 
   APIPermission:
     Type: 'AWS::Lambda::Permission'
@@ -155,3 +161,4 @@ Outputs:
         - .execute-api.
         - !Ref 'AWS::Region'
         - .amazonaws.com/
+
