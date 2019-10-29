@@ -27,10 +27,10 @@ Resources:
           def dynamo_itemcreate(count):
               dynamodb = boto3.client('dynamodb')
               db_name = "Assessment"
-              dynamodb.put_item(TableName=db_name, Item={'count': count)
+              dynamodb.put_item(TableName=db_name, Item={'count': {'N': count}})
               
           def lambda_handler(event, context):
-              dynamo_itemcreate(1)
+              dynamo_itemcreate('1')
               
       Description: API Gateway Assessment
       Handler: index.lambda_handler
