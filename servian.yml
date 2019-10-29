@@ -28,27 +28,16 @@ Resources:
           def lambda_handler(event, context):
               dynamodb = boto3.client('dynamodb')
               
-              dynamodb.put_item(TableName='Assessment', Item={'count': {'N': '3'}})
-              
               response = dynamodb.scan(TableName='Assessment')
               
-              j = 0
+              j = 1
               for i in response['Items']:
                   print(i['count'])
                   j += 1
-              print(j)
+              
+              dynamodb.put_item(TableName='Assessment', Item={'count': {'N': str(j)}})
 
-              text = "Call number " + str(j)
-
-              response = {
-                  "statusCode": 200,
-                  "body": text,
-                  "headers": {
-                      'Content-Type': 'text/html',
-                  }
-              }
-
-              return(response)
+              return('<html><head><title>HTML from API Gateway/Lambda</title></head><body><h2>Call number ' + str(j) + '</h2></body></html>')
               
 
       Description: API Gateway Assessment
@@ -130,26 +119,33 @@ Resources:
               - Arn
             - /invocations
         IntegrationResponses:
-          - ResponseTemplates:
-              text/html: ''
-            ResponseParameters:
-              method.response.header.Location: integration.response.body.headers.uid
-            StatusCode: 200
-        PassthroughBehavior: WHEN_NO_MATCH
-      MethodResponses:
-        - ResponseModels:
-            application/json: Empty
+        - StatusCode: 200
           ResponseParameters:
-            method.response.header.Location: true
+            method.response.header.Content-Type: "'text/html'"
+          ResponseTemplates:
+            text/html: "$input.path('$')"
+      MethodResponses:
+        - ResponseParameters:
+            method.response.header.Content-Type: true
           StatusCode: 200
+
+  ApiDeployment:
+    Type: 'AWS::ApiGateway::Deployment'
+    Properties:
+      RestApiId: !Ref ApiRestApi
+      StageName: default
+    DependsOn:
+      - ApiMethod
+      - ApiRestApi
+      - APIPermission
 
 Outputs:
   Url:
-    Description: Root URL of the API gateway
+    Description: URL of the API application
     Value: !Join 
       - ''
       - - 'https://'
         - !Ref ApiRestApi
         - .execute-api.
         - !Ref 'AWS::Region'
-        - .amazonaws.com/
+        - .amazonaws.com/default
