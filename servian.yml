@@ -38,6 +38,17 @@ Resources:
                   j += 1
               print(j)
 
+              text = "Call number " + str(j)
+
+              response = {
+                  "statusCode": 200,
+                  "body": text,
+                  "headers": {
+                      'Content-Type': 'text/html',
+                  }
+              }
+
+              return(response)
               
 
       Description: API Gateway Assessment
@@ -99,21 +110,12 @@ Resources:
         Types: 
           - REGIONAL
 
-  ApiResource:
-    Type: 'AWS::ApiGateway::Resource'
-    Properties:
-      ParentId: !GetAtt 
-        - ApiRestApi
-        - RootResourceId
-      RestApiId: !Ref ApiRestApi
-      PathPart: 'add_new'
-
   ApiMethod:
     Type: 'AWS::ApiGateway::Method'
     Properties:
       RestApiId: !Ref ApiRestApi
-      ResourceId: !Ref ApiResource
-      HttpMethod: POST
+      ResourceId: { "Fn::GetAtt": ["ApiRestApi", "RootResourceId"] }
+      HttpMethod: GET
       AuthorizationType: NONE
       Integration:
         Type: AWS
@@ -129,27 +131,17 @@ Resources:
             - /invocations
         IntegrationResponses:
           - ResponseTemplates:
-              application/json: '{}'
+              text/html: ''
             ResponseParameters:
               method.response.header.Location: integration.response.body.headers.uid
-            StatusCode: 201
-        PassthroughBehavior: NEVER
+            StatusCode: 200
+        PassthroughBehavior: WHEN_NO_MATCH
       MethodResponses:
         - ResponseModels:
             application/json: Empty
           ResponseParameters:
             method.response.header.Location: true
-          StatusCode: 201
-
-  ApiDeployment:
-    Type: 'AWS::ApiGateway::Deployment'
-    Properties:
-      RestApiId: !Ref ApiRestApi
-      StageName: v1
-    DependsOn:
-      - ApiMethod
-      - ApiRestApi
-      - APIPermission
+          StatusCode: 200
 
 Outputs:
   Url:
@@ -161,4 +153,3 @@ Outputs:
         - .execute-api.
         - !Ref 'AWS::Region'
         - .amazonaws.com/
-
